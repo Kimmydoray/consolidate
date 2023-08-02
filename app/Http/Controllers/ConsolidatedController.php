@@ -8,6 +8,9 @@ use League\Csv\Reader;
 use League\Csv\Statement;
 use League\Csv\Writer;
 
+use Illuminate\Support\Facades\Log;
+
+
 use Carbon\Carbon;
 
 class ConsolidatedController extends Controller
@@ -19,17 +22,6 @@ class ConsolidatedController extends Controller
 
         // Create a CSV reader instance
         $csv = Reader::createFromPath($csvFilePath, 'r');
-        
-        // $newColumnName1 = 'Total Match';
-        // $header = $csv->getHeader();
-        // $header[] = $newColumnName1;
-        // $csvUpdated->insertOne($header);
-
-        
-        // $csv->insertBeforeHeader($newColumnName1);
-
-        // $newColumnName2 = 'Asset Types';
-        // $csv->insertBeforeHeader($newColumnName2);
 
         // Fetch the header record
         $headers = $csv->getHeader();
@@ -47,14 +39,12 @@ class ConsolidatedController extends Controller
         // Create an array to hold the updated data
         $updatedData = [];
         
-
-        
-
         // Loop through the CSV records one by one
         $count = 0;
         $total = 0;
         foreach ($data as $index => $record) {
-            if ($count <= 200) {
+            Log::info('Running Line ' . $index . "<br>");
+            // if ($count <= 200) {
                 //GET COMPARE DATES
                 $origDate = Carbon::parse($record['In Service Date']);
                 $startDate = $origDate->subDays(90)->toDateString();
@@ -62,39 +52,65 @@ class ConsolidatedController extends Controller
 
                 //GET COMPARE PERCENT
 
-                $bookBasis = str_replace(',', '', "395.00");
-                $startCost = ($bookBasis * 0.05);
+                $bookBasis = floatval(str_replace(',', '', $record[' Book Basis ']));
+                $startCost = $bookBasis * 0.05;
                 $startCost = $bookBasis - $startCost;
                 $endCost = ($bookBasis * 0.05) + $bookBasis;
 
                 // echo $startCost . "<br>" . $endCost;
 
                 $data = Consolidated::whereBetween('u_acquisition_date', [$startDate, $endDate])
-                    ->whereBetween('acquisition_cost', [$startCost, $endCost])->pluck('asset_type')->toArray();
+                    ->whereBetween('acquisition_cost', [$startCost, $endCost])->select('asset_type', 'acquisition_cost', 'name')->get();
                 
                 $total = $total + count($data);
                 $record[$newColumnTotalMatch] = count($data);
                 if (count($data)) {
+                    $mergedAsset = '';
+                    //UPDATE COLUMN DATA
+                    if (count($data) > 1) {
+                        $asset_types = [];
+                        foreach($data as $key => $value) {
+                            array_push($asset_types, $value['asset_type']);
+
+                            if($data[$key]['acquisition_cost'] == $record[' Book Basis ']) {
+                                $record['name'] = $data[0]['name'];
+                                $record['In Scope'] = "Z";
+                            } else {
+                                $record['name'] = $record['Book'];
+                                $record['In Scope'] = "ZZZZ";
+                            }
+                        }
+                        $mergedAsset = implode(', ', $asset_types);
+                    } else {
+                        if($data[0]['acquisition_cost'] == $record[' Book Basis ']) {
+                            $record['name'] = $data[0]['name'];
+                            $record['In Scope'] = "Z";
+                        } else {
+                            $record['name'] = $record['Book'];
+                            $record['In Scope'] = "ZZZZ";
+                        }
+                    }
                     
-                    $mergedAsset = implode(', ', $data);
                     $record[$newColumnAssetType] = $mergedAsset;
+
                 }
                 $updatedData[] = $record;
 
-                // // Write the updated data rows to the CSV file
-                // $csvUpdated->insertAll($data);
-            } else {
-                $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
-                $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
-                $csvUpdated->insertAll($updatedData);
-                
+            // } else {
+            //     $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+            //     $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+            //     $csvUpdated->insertAll($updatedData);
 
-
-                return response()->json(['match' => $total]);
-            }
-            $count++;
+            //     return response()->json(['match' => $total]);
+            // }
+            // $count++;
 
         }
+        $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+        $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+        $csvUpdated->insertAll($updatedData);
+
+        return response()->json(['match' => $total]);
        
     }
 
@@ -109,18 +125,7 @@ class ConsolidatedController extends Controller
             $filePath = $uploadedFile->getRealPath();
             
             // Create a CSV reader instance
-            $csv = Reader::createFromPath($csvFilePath, 'r');
-            
-            // $newColumnName1 = 'Total Match';
-            // $header = $csv->getHeader();
-            // $header[] = $newColumnName1;
-            // $csvUpdated->insertOne($header);
-
-            
-            // $csv->insertBeforeHeader($newColumnName1);
-
-            // $newColumnName2 = 'Asset Types';
-            // $csv->insertBeforeHeader($newColumnName2);
+            $csv = Reader::createFromPath($filePath, 'r');
 
             // Fetch the header record
             $headers = $csv->getHeader();
@@ -138,14 +143,12 @@ class ConsolidatedController extends Controller
             // Create an array to hold the updated data
             $updatedData = [];
             
-
-            
-
             // Loop through the CSV records one by one
             $count = 0;
             $total = 0;
             foreach ($data as $index => $record) {
-                if ($count <= 200) {
+                Log::info('Running Line ' . $index . "<br>");
+                // if ($count <= 200) {
                     //GET COMPARE DATES
                     $origDate = Carbon::parse($record['In Service Date']);
                     $startDate = $origDate->subDays(90)->toDateString();
@@ -153,41 +156,65 @@ class ConsolidatedController extends Controller
 
                     //GET COMPARE PERCENT
 
-                    $bookBasis = str_replace(',', '', "395.00");
-                    $startCost = ($bookBasis * 0.05);
+                    $bookBasis = floatval(str_replace(',', '', $record[' Book Basis ']));
+                    $startCost = $bookBasis * 0.05;
                     $startCost = $bookBasis - $startCost;
                     $endCost = ($bookBasis * 0.05) + $bookBasis;
 
                     // echo $startCost . "<br>" . $endCost;
 
                     $data = Consolidated::whereBetween('u_acquisition_date', [$startDate, $endDate])
-                        ->whereBetween('acquisition_cost', [$startCost, $endCost])->pluck('asset_type')->toArray();
+                        ->whereBetween('acquisition_cost', [$startCost, $endCost])->select('asset_type', 'acquisition_cost', 'name')->get();
                     
                     $total = $total + count($data);
                     $record[$newColumnTotalMatch] = count($data);
                     if (count($data)) {
+                        $mergedAsset = '';
+                        //UPDATE COLUMN DATA
+                        if (count($data) > 1) {
+                            $asset_types = [];
+                            foreach($data as $key => $value) {
+                                array_push($asset_types, $value['asset_type']);
+
+                                if($data[$key]['acquisition_cost'] == $record[' Book Basis ']) {
+                                    $record['name'] = $data[0]['name'];
+                                    $record['In Scope'] = "Z";
+                                } else {
+                                    $record['name'] = $record['Book'];
+                                    $record['In Scope'] = "ZZZZ";
+                                }
+                            }
+                            $mergedAsset = implode(', ', $asset_types);
+                        } else {
+                            if($data[0]['acquisition_cost'] == $record[' Book Basis ']) {
+                                $record['name'] = $data[0]['name'];
+                                $record['In Scope'] = "Z";
+                            } else {
+                                $record['name'] = $record['Book'];
+                                $record['In Scope'] = "ZZZZ";
+                            }
+                        }
                         
-                        $mergedAsset = implode(', ', $data);
                         $record[$newColumnAssetType] = $mergedAsset;
+
                     }
                     $updatedData[] = $record;
 
-                    // // Write the updated data rows to the CSV file
-                    // $csvUpdated->insertAll($data);
-                } else {
-                    $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
-                    $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
-                    $csvUpdated->insertAll($updatedData);
-                    
+                // } else {
+                //     $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+                //     $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+                //     $csvUpdated->insertAll($updatedData);
 
-
-                    return response()->json(['match' => $total]);
-                }
-                $count++;
+                //     return response()->json(['match' => $total]);
+                // }
+                // $count++;
 
             }
-        }
+            $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+            $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+            $csvUpdated->insertAll($updatedData);
 
-        return response()->json(['data' => $request]);
+            return response()->json(['match' => $total]);
+        }
     }
 }
