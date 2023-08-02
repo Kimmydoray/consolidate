@@ -17,6 +17,10 @@ class ConsolidatedController extends Controller
 {
     public function index(Request $request)
     {
+
+        ini_set('memory_limit', '2048M');
+        ini_set('max_execution_time', 60000);
+
         // Define the path to your CSV file
         $csvFilePath = public_path('csv/consolidate.csv');
 
@@ -111,12 +115,17 @@ class ConsolidatedController extends Controller
         $csvUpdated->insertAll($updatedData);
 
         return response()->json(['match' => $total]);
+        
+        ini_restore('memory_limit');
        
     }
 
 
     // CHECK MATCH BETWEEN CSV AND DATABASE
     public function checkMatchData(Request $request) {
+        ini_set('memory_limit', '2048M');
+        ini_set('max_execution_time', 60000);
+
         if ($request->hasFile('csv_file')) {
             // Get the uploaded file from the request
             $uploadedFile = $request->file('csv_file');
@@ -200,21 +209,14 @@ class ConsolidatedController extends Controller
                     }
                     $updatedData[] = $record;
 
-                // } else {
-                //     $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
-                //     $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
-                //     $csvUpdated->insertAll($updatedData);
-
-                //     return response()->json(['match' => $total]);
-                // }
-                // $count++;
-
             }
             $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
             $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
             $csvUpdated->insertAll($updatedData);
 
-            return response()->json(['match' => $total]);
+            return response()->json(['match' => $total, 'path' => $filePath]);
         }
+
+        ini_restore('memory_limit');
     }
 }
