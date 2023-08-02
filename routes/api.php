@@ -14,8 +14,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/index', 'App\Http\Controllers\ConsolidatedController@index');
-Route::post('/match', 'App\Http\Controllers\ConsolidatedController@checkMatchData');
+Route::group(['prefix' => 'consolidate'], function() {
+    Route::get('/index', 'App\Http\Controllers\ConsolidatedController@index');
+    Route::post('/check_match', 'App\Http\Controllers\ConsolidatedController@checkMatchData');
+});
+
+
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
