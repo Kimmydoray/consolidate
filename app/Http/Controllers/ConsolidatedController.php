@@ -36,12 +36,25 @@ class ConsolidatedController extends Controller
         
         // Set the header as the associative array keys
         $csv->setHeaderOffset(1);
+
+        // Fetch the CSV data as an array
+        $newColumnTotalMatch = 'Total Match';
+        $newColumnAssetType = 'Asset Types';
+
+        $data = $csv->getRecords();
+        $header[] = $newColumnTotalMatch;
         
+        // Create an array to hold the updated data
+        $updatedData = [];
+        
+
+        
+
         // Loop through the CSV records one by one
         $count = 0;
         $total = 0;
-        foreach ($csv->getRecords() as $record) {
-            if ($count <= 7) {
+        foreach ($data as $index => $record) {
+            if ($count <= 200) {
                 //GET COMPARE DATES
                 $origDate = Carbon::parse($record['In Service Date']);
                 $startDate = $origDate->subDays(90)->toDateString();
@@ -57,12 +70,29 @@ class ConsolidatedController extends Controller
                 // echo $startCost . "<br>" . $endCost;
 
                 $data = Consolidated::whereBetween('u_acquisition_date', [$startDate, $endDate])
-                    ->whereBetween('acquisition_cost', [$startCost, $endCost])->get();
+                    ->whereBetween('acquisition_cost', [$startCost, $endCost])->pluck('asset_type')->toArray();
+                
                 $total = $total + count($data);
-                $count++;
+                $record[$newColumnTotalMatch] = count($data);
+                if (count($data)) {
+                    
+                    $mergedAsset = implode(', ', $data);
+                    $record[$newColumnAssetType] = $mergedAsset;
+                }
+                $updatedData[] = $record;
+
+                // // Write the updated data rows to the CSV file
+                // $csvUpdated->insertAll($data);
             } else {
+                $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+                $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+                $csvUpdated->insertAll($updatedData);
+                
+
+
                 return response()->json(['match' => $total]);
             }
+            $count++;
 
         }
        
@@ -79,25 +109,43 @@ class ConsolidatedController extends Controller
             $filePath = $uploadedFile->getRealPath();
             
             // Create a CSV reader instance
-            $csv = Reader::createFromPath($filePath, 'r');
+            $csv = Reader::createFromPath($csvFilePath, 'r');
             
-            $newColumnName1 = 'Total Match';
-            $csv->insertBeforeHeader($newColumnName1);
+            // $newColumnName1 = 'Total Match';
+            // $header = $csv->getHeader();
+            // $header[] = $newColumnName1;
+            // $csvUpdated->insertOne($header);
 
-            $newColumnName2 = 'Asset Types';
-            $csv->insertBeforeHeader($newColumnName2);
+            
+            // $csv->insertBeforeHeader($newColumnName1);
+
+            // $newColumnName2 = 'Asset Types';
+            // $csv->insertBeforeHeader($newColumnName2);
 
             // Fetch the header record
             $headers = $csv->getHeader();
             
             // Set the header as the associative array keys
             $csv->setHeaderOffset(1);
+
+            // Fetch the CSV data as an array
+            $newColumnTotalMatch = 'Total Match';
+            $newColumnAssetType = 'Asset Types';
+
+            $data = $csv->getRecords();
+            $header[] = $newColumnTotalMatch;
             
+            // Create an array to hold the updated data
+            $updatedData = [];
+            
+
+            
+
             // Loop through the CSV records one by one
             $count = 0;
             $total = 0;
-            foreach ($csv->getRecords() as $record) {
-                if ($count <= 7) {
+            foreach ($data as $index => $record) {
+                if ($count <= 200) {
                     //GET COMPARE DATES
                     $origDate = Carbon::parse($record['In Service Date']);
                     $startDate = $origDate->subDays(90)->toDateString();
@@ -113,15 +161,30 @@ class ConsolidatedController extends Controller
                     // echo $startCost . "<br>" . $endCost;
 
                     $data = Consolidated::whereBetween('u_acquisition_date', [$startDate, $endDate])
-                        ->whereBetween('acquisition_cost', [$startCost, $endCost])->get();
+                        ->whereBetween('acquisition_cost', [$startCost, $endCost])->pluck('asset_type')->toArray();
+                    
                     $total = $total + count($data);
-                    if(count($data)) {
+                    $record[$newColumnTotalMatch] = count($data);
+                    if (count($data)) {
                         
+                        $mergedAsset = implode(', ', $data);
+                        $record[$newColumnAssetType] = $mergedAsset;
                     }
-                    $count++;
+                    $updatedData[] = $record;
+
+                    // // Write the updated data rows to the CSV file
+                    // $csvUpdated->insertAll($data);
                 } else {
+                    $csvUpdated = Writer::createFromPath($csvFilePath, 'w+');
+                    $csvUpdated->insertOne(array_merge($csv->getHeader(), [$newColumnTotalMatch, $newColumnAssetType]));
+                    $csvUpdated->insertAll($updatedData);
+                    
+
+
                     return response()->json(['match' => $total]);
                 }
+                $count++;
+
             }
         }
 
